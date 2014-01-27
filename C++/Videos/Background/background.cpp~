@@ -68,7 +68,6 @@ int main(int argc, char *argv[])
     const int nmixtures =3;
     const bool bShadowDetection = false;
     const int history = 4;
-    double dist2Center;
     BackgroundSubtractorMOG2 bg (history,nmixtures,bShadowDetection);
     //BackgroundSubtractorMOG2 bg; 
     //bg.nmixtures = 3;
@@ -123,7 +122,7 @@ int main(int argc, char *argv[])
                 // Test if the center of a contour has crossed ROI (direction: going in or out)
                 if (parking.size() > 3)
                 {
-                	dist2Center = pointPolygonTest(parking, center, true);
+                	double dist2Center = pointPolygonTest(parking, center, true);
                 }
                 cout << center << "is " << dist2Center << " distance from the contour. \n"; 
                 putText(frame, "I", center, FONT_HERSHEY_COMPLEX_SMALL, 1.5, color, 1);

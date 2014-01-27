@@ -1,7 +1,8 @@
 NAME = background
 CC = g++
-CFLAGS = -Wall -g -O0 `pkg-config --cflags opencv`
-LIBS = `pkg-config --libs opencv`
-
+CFLAGS =   
+#LIBS = -lopencv_video -lopencv_core -lopencv_highgui -lopencv_imgproc
+#LPATH = -L/usr/local/lib 
+LIBS = -L/usr/local/lib -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_video
 all:
-	$(CC) $(CFLAGS) $(LIBS) $(NAME).cpp -o $(NAME)
+	$(CC) $(NAME).cpp $(CFLAGS) $(LIBS) -o $(NAME)
