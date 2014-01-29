@@ -9,6 +9,9 @@ using namespace std;
 
 int parking_count = 0;
 bool traceParking = false;
+bool backProjMode = false;
+int vmin = 10, vmax = 256, smin = 30;
+int trackObject = 0;
 
 vector<Point> parking; // polygon that enclose a parking space;
 
@@ -63,11 +66,17 @@ int main(int argc, char *argv[])
     Mat frame;
     Mat back;
     Mat fore;
+    Mat image;
     VideoCapture cap(0);
+    Rect trackWindow;
 
     const int nmixtures =3;
     const bool bShadowDetection = false;
     const int history = 4;
+    double dist2Center;
+    int hsize = 16;
+    float hranges[] = {0,180};
+    const float* phranges = hranges;
     BackgroundSubtractorMOG2 bg (history,nmixtures,bShadowDetection);
     //BackgroundSubtractorMOG2 bg; 
     //bg.nmixtures = 3;
@@ -75,26 +84,36 @@ int main(int argc, char *argv[])
 
     vector<vector<Point> > contours;
 
+	namedWindow( "Histogram", 1 );
     namedWindow("Frame");
     namedWindow("Background");
     setMouseCallback( "Frame", onMouse, 0 );
-    //createTrackbar( "Smin", "CamShift Demo", &smin, 256, 0 );
+    createTrackbar( "Vmin", "Frame", &vmin, 256, 0 );
+    createTrackbar( "Vmax", "Frame", &vmax, 256, 0 );
+    createTrackbar( "Smin", "Frame", &smin, 256, 0 );
+    
+    Mat hsv, hue, mask, hist, histimg = Mat::zeros(200, 320, CV_8UC3), backproj;
 
     for(;;)
     {
         cap >> frame;
         bg.operator ()(frame,fore);
         bg.getBackgroundImage(back);
+        frame.copyTo(image);
         erode(fore,fore,Mat());
         dilate(fore,fore,Mat());
+        
+        cvtColor(image, hsv, CV_BGR2HSV);
         findContours(fore,contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE); // CV_RETR_EXTERNAL retrieves only the extreme outer contours
         //drawContours(frame,contours,-1,Scalar(0,0,255),2); // This draws all the contours
         // Only draw important contours
+        
+        
 
-	vector<vector<Point> > contours_poly( contours.size() );
-  	vector<Rect> boundRect( contours.size() );
-  	vector<Point2f>center( contours.size() );
-  	vector<float>radius( contours.size() );
+		vector<vector<Point> > contours_poly( contours.size() );
+	  	vector<Rect> boundRect( contours.size() );
+	  	vector<Point2f>center( contours.size() );
+	  	vector<float>radius( contours.size() );
 
         for( unsigned int i = 0; i< contours.size(); i++ )
         {
@@ -122,15 +141,64 @@ int main(int argc, char *argv[])
                 // Test if the center of a contour has crossed ROI (direction: going in or out)
                 if (parking.size() > 3)
                 {
-                	double dist2Center = pointPolygonTest(parking, center, true);
+                	dist2Center = pointPolygonTest(parking, center, true);
                 }
                 cout << center << "is " << dist2Center << " distance from the contour. \n"; 
                 putText(frame, "I", center, FONT_HERSHEY_COMPLEX_SMALL, 1.5, color, 1);
                 rectangle(frame, boundRect[i].tl(), boundRect[i].br(), Scalar(100, 100, 200), 2, CV_AA);
+                
+                if( trackObject )
+				{
+				    int _vmin = vmin, _vmax = vmax;
+
+				    inRange(hsv, Scalar(0, smin, MIN(_vmin,_vmax)),
+				            Scalar(180, 256, MAX(_vmin, _vmax)), mask);
+				    int ch[] = {0, 0};
+				    hue.create(hsv.size(), hsv.depth());
+				    mixChannels(&hsv, 1, &hue, 1, ch, 1);
+
+				    //if( trackObject < 0 )
+				    //{
+				        Mat roi(hue, boundRect[i]), maskroi(mask, boundRect[i]);
+				        calcHist(&roi, 1, 0, maskroi, hist, 1, &hsize, &phranges);
+				        normalize(hist, hist, 0, 255, CV_MINMAX);
+				        
+				        trackWindow = boundRect[i];
+				        trackObject = 1;
+
+				        histimg = Scalar::all(0);
+				        int binW = histimg.cols / hsize;
+				        Mat buf(1, hsize, CV_8UC3);
+				        for( int i = 0; i < hsize; i++ )
+				            buf.at<Vec3b>(i) = Vec3b(saturate_cast<uchar>(i*180./hsize), 255, 255);
+				        cvtColor(buf, buf, CV_HSV2BGR);
+				            
+				        for( int i = 0; i < hsize; i++ )
+				        {
+				            int val = saturate_cast<int>(hist.at<float>(i)*histimg.rows/255);
+				            rectangle( histimg, Point(i*binW,histimg.rows),
+				                       Point((i+1)*binW,histimg.rows - val),
+				                       Scalar(buf.at<Vec3b>(i)), -1, 8 );
+				        }
+				    //}
+				    calcBackProject(&hue, 1, 0, hist, backproj, &phranges);
+				    backproj &= mask;
+				    RotatedRect trackBox = CamShift(backproj, trackWindow,
+				                        TermCriteria( CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 10, 1 ));
+				    trackBox.angle = 90-trackBox.angle;
+
+				    if( backprojMode )
+				        cvtColor( backproj, image, CV_GRAY2BGR );
+				    ellipse( image, trackBox, Scalar(0,0,255), 3, CV_AA );
+				    
+				    
+			   	}
+                
             }
         }
 
 
+		
         /*
          * Draw parking zone
          */
@@ -140,8 +208,9 @@ int main(int argc, char *argv[])
         }
         drawPaking(frame);
 
-        imshow("Frame",frame);
+        imshow("Frame",image);
         imshow("Background",back);
+        imshow( "Histogram", histimg );
 
         char c = (char)waitKey(30);
         if( c == 27 || c == 'q')
@@ -151,6 +220,12 @@ int main(int argc, char *argv[])
             case 's':
                 traceParking = !traceParking; 
                 break;
+            case 't':
+            	trackObject = !trackObject;
+            	break;
+           	case 'b':
+           		backProjMode = !backProjMode;
+           		break;
             case 'c':
                 parking.clear();
                 break;
