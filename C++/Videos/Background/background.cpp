@@ -45,15 +45,12 @@ void drawPaking(Mat &img)
     // Draw parking space
     if (!traceParking)
     {
-        //drawContours(frame, parking, -1, Scalar(0,0,255), 2);
         const Point *pts = (const Point*) Mat(parking).data;
         int npts = Mat(parking).rows;
-        //cout << "Number of polygon vertices: " << npts << endl;
-        // draw the polygon 
         polylines(img, &pts,&npts, 1,
-                true,           // draw closed contour (i.e. joint end to start) 
-                Scalar(0,255,0),// colour RGB ordering (here = green) 
-                3,              // line thickness
+                true,           		// draw closed contour (i.e. joint end to start) 
+                Scalar(0,255,0),		// colour RGB ordering (here = green) 
+                3,              		// line thickness
                 CV_AA, 0);
     }
 }
@@ -78,9 +75,6 @@ int main(int argc, char *argv[])
     float hranges[] = {0,180};
     const float* phranges = hranges;
     BackgroundSubtractorMOG2 bg (history,nmixtures,bShadowDetection);
-    //BackgroundSubtractorMOG2 bg; 
-    //bg.nmixtures = 3;
-    //bg.bShadowDetection = false;
 
     vector<vector<Point> > contours;
 
@@ -104,12 +98,8 @@ int main(int argc, char *argv[])
         dilate(fore,fore,Mat());
         
         cvtColor(image, hsv, CV_BGR2HSV);
-        findContours(fore,contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE); // CV_RETR_EXTERNAL retrieves only the extreme outer contours
-        //drawContours(frame,contours,-1,Scalar(0,0,255),2); // This draws all the contours
-        // Only draw important contours
+        findContours(fore,contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE); // CV_RETR_EXTERNAL retrieves only the extreme outer 
         
-        
-
 		vector<vector<Point> > contours_poly( contours.size() );
 	  	vector<Rect> boundRect( contours.size() );
 	  	vector<Point2f>center( contours.size() );
@@ -118,24 +108,13 @@ int main(int argc, char *argv[])
         for( unsigned int i = 0; i< contours.size(); i++ )
         {
             Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
-            //drawContours(frame, contours, i, color, 2, 8, hierarchy, 0, Point() );
             approxPolyDP( Mat(contours[i]), contours_poly[i], 3, true);
 			boundRect[i] = boundingRect ( Mat(contours_poly[i]) );
 				
             double area = boundRect[i].area();
             if (area > 5000)
             {
-                //printf("Area[%d]: %.2f\n", i, contourArea(contours[i]));
-                //drawContours(frame,contours,i,color,2); // This draws all the contours
-
                 // Track if an object of interest has crossed a roi
-               
-				//minEnclosingCircle( (Mat)contours_poly[i], center[i], radius[i]);
-               
-				// double pointPolygonTest(const Mat& contour, Point2f pt, bool measureDist)
-
-                //Rect box = boundingRect(contours[i]); // Get bounding box around a countour
-                // cout << "[x=" << box.x << " , y=" << box.y << ",w=" << box.width << ",h=" << box.height << "]\n"; 
                 Point2f center(boundRect[i].x + boundRect[i].width/2.0, boundRect[i].y + boundRect[i].height/2.0);
 
                 // Test if the center of a contour has crossed ROI (direction: going in or out)
@@ -157,34 +136,31 @@ int main(int argc, char *argv[])
 				    hue.create(hsv.size(), hsv.depth());
 				    mixChannels(&hsv, 1, &hue, 1, ch, 1);
 
-				    //if( trackObject < 0 )
-				    //{
-				        Mat roi(hue, boundRect[i]), maskroi(mask, boundRect[i]);
-				        calcHist(&roi, 1, 0, maskroi, hist, 1, &hsize, &phranges);
-				        normalize(hist, hist, 0, 255, CV_MINMAX);
-				        
-				        trackWindow = boundRect[i];
-				        trackObject = 1;
+			        Mat roi(hue, boundRect[i]), maskroi(mask, boundRect[i]);
+			        calcHist(&roi, 1, 0, maskroi, hist, 1, &hsize, &phranges);
+			        normalize(hist, hist, 0, 255, CV_MINMAX);
+			        
+			        trackWindow = boundRect[i];
+			        trackObject = 1;
 
-				        histimg = Scalar::all(0);
-				        int binW = histimg.cols / hsize;
-				        Mat buf(1, hsize, CV_8UC3);
-				        for( int i = 0; i < hsize; i++ )
-				            buf.at<Vec3b>(i) = Vec3b(saturate_cast<uchar>(i*180./hsize), 255, 255);
-				        cvtColor(buf, buf, CV_HSV2BGR);
-				            
-				        for( int i = 0; i < hsize; i++ )
-				        {
-				            int val = saturate_cast<int>(hist.at<float>(i)*histimg.rows/255);
-				            rectangle( histimg, Point(i*binW,histimg.rows),
-				                       Point((i+1)*binW,histimg.rows - val),
-				                       Scalar(buf.at<Vec3b>(i)), -1, 8 );
-				        }
-				    //}
+			        histimg = Scalar::all(0);
+			        int binW = histimg.cols / hsize;
+			        Mat buf(1, hsize, CV_8UC3);
+			        for( int i = 0; i < hsize; i++ )
+			            buf.at<Vec3b>(i) = Vec3b(saturate_cast<uchar>(i*180./hsize), 255, 255);
+			        cvtColor(buf, buf, CV_HSV2BGR);
+			            
+			        for( int i = 0; i < hsize; i++ )
+			        {
+			            int val = saturate_cast<int>(hist.at<float>(i)*histimg.rows/255);
+			            rectangle( histimg, Point(i*binW,histimg.rows),
+			                       Point((i+1)*binW,histimg.rows - val),
+			                       Scalar(buf.at<Vec3b>(i)), -1, 8 );
+			        }
+
 				    calcBackProject(&hue, 1, 0, hist, backproj, &phranges);
 				    backproj &= mask;
-				    RotatedRect trackBox = CamShift(backproj, trackWindow,
-				                        TermCriteria( CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 10, 1 ));
+				    RotatedRect trackBox = CamShift(backproj, trackWindow,TermCriteria( CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 10, 1 ));
 				    trackBox.angle = 90-trackBox.angle;
 
 				    if( backProjMode )

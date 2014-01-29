@@ -187,7 +187,7 @@ int main(int argc, char *argv[])
 				                        TermCriteria( CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 10, 1 ));
 				    trackBox.angle = 90-trackBox.angle;
 
-				    if( backprojMode )
+				    if( backProjMode )
 				        cvtColor( backproj, image, CV_GRAY2BGR );
 				    ellipse( image, trackBox, Scalar(0,0,255), 3, CV_AA );
 				    
